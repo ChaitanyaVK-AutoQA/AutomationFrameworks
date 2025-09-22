@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",                     // Modern JS features
+    "module": "CommonJS",                   // Use CommonJS for Node compatibility
+    "moduleResolution": "node",             // Node-style module resolution
+    "outDir": "dist",                        // Compiled JS output (optional)
+    "rootDir": ".",                          // Root of your TS files
+    "strict": true,                          // Enable strict type checking
+    "esModuleInterop": true,                 // Allows default imports from commonjs modules
+    "skipLibCheck": true,                    // Skip type checks for node_modules
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "steps/**/*.ts",
+    "support/**/*.ts",
+    "pages/**/*.ts",
+    "webFactory/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "reports"
+  ]
+}
