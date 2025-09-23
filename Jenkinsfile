@@ -7,27 +7,36 @@ pipeline {
         DASHBOARD_DIR = 'reports/dashboard'
     }
 
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 60, unit: 'MINUTES')
+    }
+
     stages {
         stage('Checkout') {
             steps {
+                echo "Checking out code..."
                 git branch: 'main', url: 'https://github.com/ChaitanyaVK-AutoQA/AutomationFrameworks.git'
             }
         }
 
         stage('Install Dependencies') {
             steps {
+                echo "Installing npm dependencies..."
                 bat 'npm install'
             }
         }
 
         stage('Install Playwright Browsers') {
             steps {
+                echo "Installing Playwright browsers..."
                 bat 'npx playwright install'
             }
         }
 
         stage('Run Cucumber Tests') {
             steps {
+                echo "Running Cucumber tests..."
                 bat """
                 npx cucumber-js --format html:${REPORTS_DIR}/cucumber.html --format junit:${REPORTS_DIR}/cucumber-results.xml
                 """
@@ -36,6 +45,7 @@ pipeline {
 
         stage('Run Playwright Tests') {
             steps {
+                echo "Running Playwright tests..."
                 bat """
                 npx playwright test --retries=2 --reporter=html --output=${REPORTS_DIR}/playwright/ --reporter=junit
                 """
@@ -44,15 +54,12 @@ pipeline {
 
         stage('Generate Unified Dashboard') {
             steps {
+                echo "Generating unified HTML dashboard..."
                 script {
-                    // Create dashboard folder
                     bat "mkdir ${DASHBOARD_DIR}"
-
-                    // Copy individual reports into dashboard folder
                     bat "copy ${REPORTS_DIR}\\cucumber.html ${DASHBOARD_DIR}\\cucumber.html"
                     bat "xcopy ${REPORTS_DIR}\\playwright\\* ${DASHBOARD_DIR}\\playwright\\ /s /e /y"
 
-                    // Create index.html linking both reports
                     writeFile file: "${DASHBOARD_DIR}/index.html", text: """
                     <html>
                         <head><title>Unified Test Dashboard</title></head>
@@ -69,12 +76,13 @@ pipeline {
             }
         }
 
-        stage('Publish Unified Dashboard') {
+        stage('Archive & Publish Reports') {
             steps {
-                // Archive HTML dashboard
-                archiveArtifacts artifacts: "${DASHBOARD_DIR}/**", allowEmptyArchive: true
+                echo "Archiving and publishing reports..."
+                junit 'reports/**/*.xml'
 
-                // Publish dashboard in Jenkins UI
+                archiveArtifacts artifacts: 'reports/**/*.html', allowEmptyArchive: true
+
                 publishHTML(target: [
                     reportDir: "${DASHBOARD_DIR}",
                     reportFiles: 'index.html',
@@ -82,15 +90,13 @@ pipeline {
                     allowMissing: true,
                     alwaysLinkToLastBuild: true
                 ])
-
-                // Archive JUnit XMLs for trends
-                junit 'reports/**/*.xml'
             }
         }
     }
 
     post {
         always {
+            echo "Cleaning workspace..."
             cleanWs(deleteDirs: true, patterns: ["!${REPORTS_DIR}/**"])
         }
     }
