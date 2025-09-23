@@ -4,12 +4,16 @@ pipeline {
     environment {
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '0'
         REPORTS_DIR = 'reports'
-        DASHBOARD_DIR = 'reports\\dashboard'  // Use backslashes for Windows
+        DASHBOARD_DIR = 'reports\\dashboard'
     }
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 60, unit: 'MINUTES')
+    }
+
+    tools {
+        nodejs 'Node24' // Name of NodeJS installation configured in Jenkins Global Tool Configuration
     }
 
     stages {
@@ -56,16 +60,16 @@ pipeline {
             steps {
                 echo "Generating unified HTML dashboard..."
                 script {
-                    // Create nested folders safely on Windows
-                    bat "mkdir ${DASHBOARD_DIR} /p"
-                    
-                    // Copy cucumber report
+                    // Safe folder creation for Windows
+                    bat "if not exist ${DASHBOARD_DIR} mkdir ${DASHBOARD_DIR}"
+
+                    // Copy Cucumber report
                     bat "copy ${REPORTS_DIR}\\cucumber.html ${DASHBOARD_DIR}\\cucumber.html"
 
                     // Copy Playwright report folder recursively
                     bat "xcopy ${REPORTS_DIR}\\playwright\\* ${DASHBOARD_DIR}\\playwright\\ /s /e /y"
 
-                    // Create index.html for dashboard
+                    // Write unified index.html
                     writeFile file: "${DASHBOARD_DIR}\\index.html", text: """
                     <html>
                         <head><title>Unified Test Dashboard</title></head>
@@ -85,14 +89,13 @@ pipeline {
         stage('Archive & Publish Reports') {
             steps {
                 echo "Archiving and publishing reports..."
-                
-                // Publish test trends from JUnit XMLs
-                junit 'reports/**/*.xml'
+                // JUnit reports
+                junit "${REPORTS_DIR}\\**\\*.xml"
 
                 // Archive HTML reports
-                archiveArtifacts artifacts: 'reports/**/*.html', allowEmptyArchive: true
+                archiveArtifacts artifacts: "${REPORTS_DIR}\\**\\*.html", allowEmptyArchive: true
 
-                // Publish dashboard in Jenkins UI
+                // Publish unified dashboard
                 publishHTML(target: [
                     reportDir: "${DASHBOARD_DIR}",
                     reportFiles: 'index.html',
@@ -107,8 +110,8 @@ pipeline {
     post {
         always {
             echo "Cleaning workspace..."
-            // Keep reports folder, delete everything else
-            cleanWs(deleteDirs: true, patterns: ["!${REPORTS_DIR}\\**"])
+            // Preserve reports folder while cleaning other files
+            cleanWs(deleteDirs: true, patterns: [[pattern: "!${REPORTS_DIR}\\**"]])
         }
     }
 }
