@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'Node24'   // Name of NodeJS tool you configure in Jenkins Global Tool Configuration
-    }
-
     environment {
         // Optional: set environment variables for Playwright
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '1' // if you already have browsers installed
