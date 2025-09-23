@@ -12,10 +12,6 @@ pipeline {
         timeout(time: 60, unit: 'MINUTES')
     }
 
-    tools {
-        nodejs 'Node24' // Name of NodeJS installation configured in Jenkins Global Tool Configuration
-    }
-
     stages {
         stage('Checkout') {
             steps {
