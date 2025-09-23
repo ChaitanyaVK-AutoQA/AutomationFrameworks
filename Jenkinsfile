@@ -4,7 +4,7 @@ pipeline {
     environment {
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '0'
         REPORTS_DIR = 'reports'
-        DASHBOARD_DIR = 'reports/dashboard'
+        DASHBOARD_DIR = 'reports\\dashboard'  // Use backslashes for Windows
     }
 
     options {
@@ -38,7 +38,7 @@ pipeline {
             steps {
                 echo "Running Cucumber tests..."
                 bat """
-                npx cucumber-js --format html:${REPORTS_DIR}/cucumber.html --format junit:${REPORTS_DIR}/cucumber-results.xml
+                npx cucumber-js --format html:${REPORTS_DIR}\\cucumber.html --format junit:${REPORTS_DIR}\\cucumber-results.xml
                 """
             }
         }
@@ -47,7 +47,7 @@ pipeline {
             steps {
                 echo "Running Playwright tests..."
                 bat """
-                npx playwright test --retries=2 --reporter=html --output=${REPORTS_DIR}/playwright/ --reporter=junit
+                npx playwright test --retries=2 --reporter=html --output=${REPORTS_DIR}\\playwright\\ --reporter=junit
                 """
             }
         }
@@ -56,11 +56,17 @@ pipeline {
             steps {
                 echo "Generating unified HTML dashboard..."
                 script {
-                    bat "mkdir ${DASHBOARD_DIR}"
+                    // Create nested folders safely on Windows
+                    bat "mkdir ${DASHBOARD_DIR} /p"
+                    
+                    // Copy cucumber report
                     bat "copy ${REPORTS_DIR}\\cucumber.html ${DASHBOARD_DIR}\\cucumber.html"
+
+                    // Copy Playwright report folder recursively
                     bat "xcopy ${REPORTS_DIR}\\playwright\\* ${DASHBOARD_DIR}\\playwright\\ /s /e /y"
 
-                    writeFile file: "${DASHBOARD_DIR}/index.html", text: """
+                    // Create index.html for dashboard
+                    writeFile file: "${DASHBOARD_DIR}\\index.html", text: """
                     <html>
                         <head><title>Unified Test Dashboard</title></head>
                         <body>
@@ -79,10 +85,14 @@ pipeline {
         stage('Archive & Publish Reports') {
             steps {
                 echo "Archiving and publishing reports..."
+                
+                // Publish test trends from JUnit XMLs
                 junit 'reports/**/*.xml'
 
+                // Archive HTML reports
                 archiveArtifacts artifacts: 'reports/**/*.html', allowEmptyArchive: true
 
+                // Publish dashboard in Jenkins UI
                 publishHTML(target: [
                     reportDir: "${DASHBOARD_DIR}",
                     reportFiles: 'index.html',
@@ -97,7 +107,8 @@ pipeline {
     post {
         always {
             echo "Cleaning workspace..."
-            cleanWs(deleteDirs: true, patterns: ["!${REPORTS_DIR}/**"])
+            // Keep reports folder, delete everything else
+            cleanWs(deleteDirs: true, patterns: ["!${REPORTS_DIR}\\**"])
         }
     }
 }
