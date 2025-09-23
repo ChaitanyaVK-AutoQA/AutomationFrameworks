@@ -37,18 +37,14 @@ pipeline {
         stage('Run Cucumber Tests') {
             steps {
                 echo "Running Cucumber tests..."
-                bat """
-                npx cucumber-js --format html:${REPORTS_DIR}\\cucumber.html --format junit:${REPORTS_DIR}\\cucumber-results.xml
-                """
+                bat "npx cucumber-js --format html:%REPORTS_DIR%\\cucumber.html --format junit:%REPORTS_DIR%\\cucumber-results.xml"
             }
         }
 
         stage('Run Playwright Tests') {
             steps {
                 echo "Running Playwright tests..."
-                bat """
-                npx playwright test --retries=2 --reporter=html --output=${REPORTS_DIR}\\playwright\\ --reporter=junit
-                """
+                bat "npx playwright test --retries=2 --reporter=html --output=%REPORTS_DIR%\\playwright\\ --reporter=junit"
             }
         }
 
@@ -56,17 +52,11 @@ pipeline {
             steps {
                 echo "Generating unified HTML dashboard..."
                 script {
-                    // Safe folder creation for Windows
-                    bat "if not exist ${DASHBOARD_DIR} mkdir ${DASHBOARD_DIR}"
+                    bat "mkdir %DASHBOARD_DIR%"
+                    bat "copy %REPORTS_DIR%\\cucumber.html %DASHBOARD_DIR%\\cucumber.html"
+                    bat "xcopy %REPORTS_DIR%\\playwright\\* %DASHBOARD_DIR%\\playwright\\ /s /e /y"
 
-                    // Copy Cucumber report
-                    bat "copy ${REPORTS_DIR}\\cucumber.html ${DASHBOARD_DIR}\\cucumber.html"
-
-                    // Copy Playwright report folder recursively
-                    bat "xcopy ${REPORTS_DIR}\\playwright\\* ${DASHBOARD_DIR}\\playwright\\ /s /e /y"
-
-                    // Write unified index.html
-                    writeFile file: "${DASHBOARD_DIR}\\index.html", text: """
+                    writeFile file: "%DASHBOARD_DIR%\\index.html", text: """
                     <html>
                         <head><title>Unified Test Dashboard</title></head>
                         <body>
@@ -85,15 +75,12 @@ pipeline {
         stage('Archive & Publish Reports') {
             steps {
                 echo "Archiving and publishing reports..."
-                // JUnit reports
-                junit "${REPORTS_DIR}\\**\\*.xml"
+                junit 'reports/**/*.xml'
 
-                // Archive HTML reports
-                archiveArtifacts artifacts: "${REPORTS_DIR}\\**\\*.html", allowEmptyArchive: true
+                archiveArtifacts artifacts: 'reports/**/*.html', allowEmptyArchive: true
 
-                // Publish unified dashboard
                 publishHTML(target: [
-                    reportDir: "${DASHBOARD_DIR}",
+                    reportDir: "%DASHBOARD_DIR%",
                     reportFiles: 'index.html',
                     reportName: 'Unified Test Dashboard',
                     allowMissing: true,
@@ -106,8 +93,7 @@ pipeline {
     post {
         always {
             echo "Cleaning workspace..."
-            // Preserve reports folder while cleaning other files
-            cleanWs(deleteDirs: true, patterns: [[pattern: "!${REPORTS_DIR}\\**"]])
+            cleanWs()
         }
     }
 }
