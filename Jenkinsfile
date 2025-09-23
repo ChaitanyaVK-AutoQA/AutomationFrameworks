@@ -2,48 +2,88 @@ pipeline {
     agent any
 
     environment {
-        // Optional: set environment variables for Playwright
-        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '1' // if you already have browsers installed
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '0'
+        REPORTS_DIR = 'reports'
+        DASHBOARD_DIR = 'reports/dashboard'
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                // Checkout code from GitHub
                 git branch: 'main', url: 'https://github.com/ChaitanyaVK-AutoQA/AutomationFrameworks.git'
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                // Install npm packages
                 bat 'npm install'
             }
         }
 
         stage('Install Playwright Browsers') {
             steps {
-                // Download browsers if needed
                 bat 'npx playwright install'
             }
         }
 
-        stage('Run Cucumber + Playwright Tests') {
+        stage('Run Cucumber Tests') {
             steps {
-                // Run tests (update if you have a custom command)
-                bat 'npx cucumber-js'  
-                // or if you are using Playwright test runner:
-                // bat 'npx playwright test'
+                bat """
+                npx cucumber-js --format html:${REPORTS_DIR}/cucumber.html --format junit:${REPORTS_DIR}/cucumber-results.xml
+                """
             }
         }
 
-        stage('Publish Test Reports') {
+        stage('Run Playwright Tests') {
             steps {
-                // If you generate HTML reports, archive them
-                archiveArtifacts artifacts: 'reports/**/*.html', allowEmptyArchive: true
+                bat """
+                npx playwright test --retries=2 --reporter=html --output=${REPORTS_DIR}/playwright/ --reporter=junit
+                """
+            }
+        }
 
-                // Optional: JUnit XML reports
+        stage('Generate Unified Dashboard') {
+            steps {
+                script {
+                    // Create dashboard folder
+                    bat "mkdir ${DASHBOARD_DIR}"
+
+                    // Copy individual reports into dashboard folder
+                    bat "copy ${REPORTS_DIR}\\cucumber.html ${DASHBOARD_DIR}\\cucumber.html"
+                    bat "xcopy ${REPORTS_DIR}\\playwright\\* ${DASHBOARD_DIR}\\playwright\\ /s /e /y"
+
+                    // Create index.html linking both reports
+                    writeFile file: "${DASHBOARD_DIR}/index.html", text: """
+                    <html>
+                        <head><title>Unified Test Dashboard</title></head>
+                        <body>
+                            <h1>Test Dashboard</h1>
+                            <ul>
+                                <li><a href="cucumber.html" target="_blank">Cucumber Report</a></li>
+                                <li><a href="playwright/index.html" target="_blank">Playwright Report</a></li>
+                            </ul>
+                        </body>
+                    </html>
+                    """
+                }
+            }
+        }
+
+        stage('Publish Unified Dashboard') {
+            steps {
+                // Archive HTML dashboard
+                archiveArtifacts artifacts: "${DASHBOARD_DIR}/**", allowEmptyArchive: true
+
+                // Publish dashboard in Jenkins UI
+                publishHTML(target: [
+                    reportDir: "${DASHBOARD_DIR}",
+                    reportFiles: 'index.html',
+                    reportName: 'Unified Test Dashboard',
+                    allowMissing: true,
+                    alwaysLinkToLastBuild: true
+                ])
+
+                // Archive JUnit XMLs for trends
                 junit 'reports/**/*.xml'
             }
         }
@@ -51,8 +91,7 @@ pipeline {
 
     post {
         always {
-            // Clean workspace after build (optional)
-            cleanWs()
+            cleanWs(deleteDirs: true, patterns: ["!${REPORTS_DIR}/**"])
         }
     }
 }
