@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven3'   // configure Maven in Jenkins (Global Tool Configuration)
-        jdk 'JDK17'      // configure JDK in Jenkins
+        maven 'Maven3'   // configure this in Jenkins -> Global Tool Configuration
+        jdk 'JDK17'      // configure this in Jenkins -> Global Tool Configuration
     }
 
     stages {
@@ -15,20 +15,13 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh "mvn clean compile"
+                bat 'mvn clean install -DskipTests'
             }
         }
 
-        stage('Run Tests') {
+        stage('Test') {
             steps {
-                sh "mvn test"
-            }
-        }
-
-        stage('Archive Reports') {
-            steps {
-                junit '**/target/surefire-reports/*.xml'
-                archiveArtifacts artifacts: 'target/**/*.html', allowEmptyArchive: true
+                bat 'mvn test'
             }
         }
     }
