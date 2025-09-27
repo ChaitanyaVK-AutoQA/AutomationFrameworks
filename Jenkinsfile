@@ -2,9 +2,11 @@ pipeline {
     agent any
 
     environment {
+        DOCKER_HOST = 'tcp://localhost:2375'      // LocalSystem Docker access
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '0'
         REPORTS_DIR = 'reports'
-        DASHBOARD_DIR = 'reports\\dashboard'
+        DASHBOARD_DIR = 'reports/dashboard'
+        PLAYWRIGHT_REPORT_DIR = "${DASHBOARD_DIR}/playwright"
     }
 
     options {
@@ -13,6 +15,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 echo "Checking out code..."
@@ -23,14 +26,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo "Installing npm dependencies..."
-                bat 'npm install'
-            }
-        }
-
-        stage('Install Playwright Browsers') {
-            steps {
-                echo "Installing Playwright browsers..."
-                bat 'npx playwright install'
+                bat 'npm ci'
             }
         }
 
@@ -41,21 +37,30 @@ pipeline {
             }
         }
 
-        stage('Run Playwright Tests') {
+        stage('Run Playwright Tests via Docker Compose') {
             steps {
-                echo "Running Playwright tests..."
-                bat "npx playwright test --retries=2 --reporter=html --output=%REPORTS_DIR%\\playwright\\ --reporter=junit"
+                echo "Running Playwright tests via Docker Compose..."
+                bat '''
+                docker-compose up --build --abort-on-container-exit
+                docker-compose down
+                '''
             }
         }
 
-        stage('Generate Unified Dashboard') {
+        stage('Prepare Unified Dashboard') {
             steps {
-                echo "Generating unified HTML dashboard..."
+                echo "Preparing unified dashboard..."
                 script {
-                    bat "mkdir %DASHBOARD_DIR%"
-                    bat "copy %REPORTS_DIR%\\cucumber.html %DASHBOARD_DIR%\\cucumber.html"
-                    bat "xcopy %REPORTS_DIR%\\playwright\\* %DASHBOARD_DIR%\\playwright\\ /s /e /y"
+                    // Create dashboard directories
+                    bat "mkdir %PLAYWRIGHT_REPORT_DIR%"
 
+                    // Copy Playwright reports from container output
+                    bat "xcopy %REPORTS_DIR%\\playwright\\* %PLAYWRIGHT_REPORT_DIR%\\ /s /e /y"
+
+                    // Copy Cucumber report
+                    bat "copy %REPORTS_DIR%\\cucumber.html %DASHBOARD_DIR%\\cucumber.html"
+
+                    // Generate unified index.html
                     writeFile file: "%DASHBOARD_DIR%\\index.html", text: """
                     <html>
                         <head><title>Unified Test Dashboard</title></head>
