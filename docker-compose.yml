@@ -1,0 +1,15 @@
+version: '3.9'
+
+services:
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.48.0-jammy
+    container_name: playwright-test
+    working_dir: /app
+    volumes:
+      - .:/app          # Mount current Jenkins workspace
+    entrypoint: bash -c
+    command: >
+      "npm ci &&
+       npx playwright install --with-deps &&
+       npx playwright test --retries=2 --reporter=html --reporter=junit --output=reports/playwright/"
+    ipc: host
